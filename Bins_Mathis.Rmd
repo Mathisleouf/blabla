@@ -1,0 +1,302 @@
+---
+title: "Create bins"
+output:
+  html_document:
+    df_print: paged
+---
+
+Load packages
+
+```{r}
+library(readr)
+library(tidyverse)
+
+```
+
+
+File list
+
+```{r}
+file_list <- list.files(pattern="*.csv")
+file_list
+```
+
+Read csv
+```{r}
+ldf <- lapply(file_list , read_csv)
+file_names<-gsub(pattern = "\\.csv$", "", file_list)
+```
+
+Generation of dataframe with all measurements
+
+```{r}
+df.final <- do.call("rbind", ldf)
+```
+
+Plot area versus Hoechst Integrated Intensity
+
+```{r}
+
+ggplot(df.final, aes(x=df.final$IntDen_Hoechst, y=df.final$Area))+geom_jitter()+
+  theme_classic()+
+  geom_smooth(method = "lm", se = TRUE)
+
+
+ggplot(df.final, aes(x=df.final$Perim., y=df.final$Area))+geom_jitter()+
+  theme_classic()+
+  geom_smooth(method = "lm", se = TRUE)
+
+###Clean according to perimeter
+
+#Multivariate Model Approach to remove outliers
+
+#Cook’s Distance
+mod <- lm(Area ~ Perim., data=df.final)
+cooksd <- cooks.distance(mod)
+nrow(df.final)
+
+plot(cooksd, pch="*", cex=2, main="Influential Obs by Cooks distance- Area vs. Perimeter")  # plot cook's distance
+abline(h = 4*mean(cooksd, na.rm=T), col="red")  # add cutoff line
+text(x=1:length(cooksd)+1, y=cooksd, labels=ifelse(cooksd>4*mean(cooksd, na.rm=T),names(cooksd),""), col="red")  # add labels
+
+influential_Area_vs_Perim <- as.numeric(names(cooksd)[(cooksd > (4/nrow(df.final)))])
+working_df_wo_outliers_1 <- df.final[-influential_Area_vs_Perim, ]
+nrow(working_df_wo_outliers_1)
+
+ggplot(working_df_wo_outliers_1, aes(x=working_df_wo_outliers_1$Perim., y=working_df_wo_outliers_1$Area))+geom_jitter()+
+  theme_classic()+
+  geom_smooth(method = "lm", se = TRUE)
+
+
+Perim_limits<-c(25:90)
+working_df_wo_outliers_2<-filter(working_df_wo_outliers_1, Perim.<90 & Perim.>25)
+nrow(working_df_wo_outliers_1)
+nrow(working_df_wo_outliers_2)
+
+ggplot(working_df_wo_outliers_2, aes(x=working_df_wo_outliers_2$Perim., y=working_df_wo_outliers_2$Area))+geom_jitter()+
+  theme_classic()+
+  geom_smooth(method = "lm", se = TRUE)
+
+
+working_df_wo_outliers_3<-filter(working_df_wo_outliers_2, Area>2.5*Perim.)
+nrow(working_df_wo_outliers_3)
+
+#Polynom
+ggplot(working_df_wo_outliers_2, aes(x=working_df_wo_outliers_2$Perim., y=working_df_wo_outliers_2$Area))+geom_jitter()+
+  geom_jitter(inherit.aes = FALSE, data = subset(working_df_wo_outliers_2, Area>(Perim.^1.2)+1.1*Perim.-50),aes(x = Perim., y  = Area), width = 0.1, size =1, color = "red")+
+  theme_classic()+
+  geom_smooth(method = "lm", se = TRUE)
+
+nrow(working_df_wo_outliers_2)
+working_df_wo_outliers_3<-filter(working_df_wo_outliers_2, Area>(Perim.^1.2)+1.1*Perim.-50)
+nrow(working_df_wo_outliers_3)
+
+
+#Hoechst vs Area
+
+ggplot(working_df_wo_outliers_3, aes(x=working_df_wo_outliers_3$IntDen_Hoechst, y=working_df_wo_outliers_3$Area))+geom_jitter()+
+  theme_classic()+
+  geom_smooth(method = "lm", se = TRUE)
+
+
+#Multivariate Model Approach to remove outliers
+
+#Cook’s Distance
+mod <- lm(Area ~ IntDen_Hoechst, data=working_df_wo_outliers_3)
+cooksd <- cooks.distance(mod)
+nrow(working_df_wo_outliers_3)
+
+plot(cooksd, pch="*", cex=2, main="Influential Obs by Cooks distance")  # plot cook's distance
+abline(h = 4*mean(cooksd, na.rm=T), col="red")  # add cutoff line
+text(x=1:length(cooksd)+1, y=cooksd, labels=ifelse(cooksd>4*mean(cooksd, na.rm=T),names(cooksd),""), col="red")  # add labels
+
+
+
+
+
+# Removing Outliers
+# influential row numbers
+influential <- as.numeric(names(cooksd)[(cooksd > (4/nrow(working_df_wo_outliers_3)))])
+
+working_df_wo_outliers_4 <- working_df_wo_outliers_3[-influential, ]
+
+ggplot(working_df_wo_outliers_4, aes(x=working_df_wo_outliers_4$IntDen_Hoechst, y=working_df_wo_outliers_4$Area))+geom_jitter()+
+  theme_classic()+
+  geom_smooth(method = "lm", se = TRUE)
+
+
+nrow(working_df_wo_outliers_4)
+
+
+min(working_df_wo_outliers_4$Mean_EdU)
+max(working_df_wo_outliers_4$Mean_EdU)
+
+min(working_df_wo_outliers_4$IntDen_Hoechst)
+max(working_df_wo_outliers_4$IntDen_Hoechst)
+
+```
+
+Plot EdU mean intensity  versus Hoechst Integrated Intensity
+
+```{r}
+
+
+
+min(working_df_wo_outliers_4$Mean_EdU)
+max(working_df_wo_outliers_4$Mean_EdU)
+
+min(working_df_wo_outliers_4$IntDen_Hoechst)
+max(working_df_wo_outliers_4$IntDen_Hoechst)
+
+
+
+ggplot(working_df_wo_outliers_4, aes(x=IntDen_Hoechst_2, y=Mean_EdU))+geom_jitter()+
+  scale_y_log10()+scale_x_log10()+
+  theme_classic()
+
+
+
+
+working_df_wo_outliers_4$Mean_EdU_2<-((working_df_wo_outliers_4$Mean_EdU)+100)*100/max(working_df_wo_outliers_4$Mean_EdU+100)
+
+working_df_wo_outliers_4$IntDen_Hoechst_2<-(working_df_wo_outliers_4$IntDen_Hoechst)*100/max(working_df_wo_outliers_4$IntDen_Hoechst)
+
+ggplot(working_df_wo_outliers_4, aes(x=IntDen_Hoechst_2, y=Mean_EdU_2))+geom_jitter()+
+  scale_y_log10()+scale_x_log10()+
+  theme_classic()
+
+
+
+working_df_wo_outliers_5<-filter(working_df_wo_outliers_4, IntDen_Hoechst_2>30)
+
+nrow(working_df_wo_outliers_5)
+ggplot(working_df_wo_outliers_5, aes(x=IntDen_Hoechst_2, y=Mean_EdU_2))+geom_jitter()+
+  scale_y_log10(breaks=c(10,20,30,40,50,60,70,80,90,100))+
+  theme_classic()
+
+ggplot(working_df_wo_outliers_5, aes(x=IntDen_Hoechst_2, y=Mean_EdU_2))+geom_jitter()+
+  scale_y_log10(breaks=c(10,20,30,40,50,60,70,80,90,100))+scale_x_log10(breaks=c(10,20,30,40,50,60,70,80,90,100))+
+  theme_classic()
+
+```
+#Filter sub parts
+```{r}
+#G1
+G1<-filter(working_df_wo_outliers_5, IntDen_Hoechst_2<45 & Mean_EdU_2<15)
+G1
+
+#G2
+G2<-filter(working_df_wo_outliers_5, IntDen_Hoechst_2>60 & Mean_EdU_2<15)
+G2
+
+#S
+S<-filter(working_df_wo_outliers_5, IntDen_Hoechst_2<80 & IntDen_Hoechst_2>30 & Mean_EdU_2>25)
+S
+
+
+#Early_S
+Early_S<-filter(working_df_wo_outliers_5, IntDen_Hoechst_2<45 & Mean_EdU_2<25& Mean_EdU_2>15)
+Early_S
+  
+#Late_S
+Late_S<-filter(working_df_wo_outliers_5, IntDen_Hoechst_2>60 & Mean_EdU_2<25& Mean_EdU_2>15)
+Late_S
+  
+
+
+working_df_wo_outliers_5$Cell_cycle<-ifelse(working_df_wo_outliers_5$IntDen_Hoechst_2<45 & working_df_wo_outliers_5$Mean_EdU_2<15, "G1",
+                                            ifelse(working_df_wo_outliers_5$IntDen_Hoechst_2>60 & working_df_wo_outliers_5$Mean_EdU_2<15,"G2", 
+                                                   ifelse(working_df_wo_outliers_5$IntDen_Hoechst_2<80 & working_df_wo_outliers_5$IntDen_Hoechst_2>30 & working_df_wo_outliers_5$Mean_EdU_2>25, "S",
+                                                          ifelse(working_df_wo_outliers_5$IntDen_Hoechst_2<45 & working_df_wo_outliers_5$Mean_EdU_2<25& working_df_wo_outliers_5$Mean_EdU_2>15, "Early S", 
+                                                                 ifelse(working_df_wo_outliers_5$IntDen_Hoechst_2>60 & working_df_wo_outliers_5$Mean_EdU_2<25& working_df_wo_outliers_5$Mean_EdU_2>15,"Late S","not incorporated")))))
+
+
+ggplot(working_df_wo_outliers_5, aes(x=IntDen_Hoechst_2, y=Mean_EdU_2))+geom_jitter()+
+  scale_y_log10(breaks=c(10,20,30,40,50,60,70,80,90,100))+scale_x_log10(breaks=c(10,20,30,40,50,60,70,80,90,100))+
+  theme_classic()
+ggplot(working_df_wo_outliers_5, aes(x=IntDen_Hoechst_2, y=Mean_EdU_2, col=Cell_cycle))+geom_jitter()+
+  scale_y_log10(breaks=c(10,20,30,40,50,60,70,80,90,100))+scale_x_log10(breaks=c(10,20,30,40,50,60,70,80,90,100))+
+  theme_classic()
+
+nrow(G1)
+nrow(Early_S)
+nrow(S)
+nrow(Late_S)
+nrow(G2)
+
+G1_length<-nrow(filter(working_df_wo_outliers_5,Cell_cycle=="G1"))
+G1_length
+
+G2_length<-nrow(filter(working_df_wo_outliers_5,Cell_cycle=="G2"))
+G2_length
+
+S_length<-nrow(filter(working_df_wo_outliers_5,Cell_cycle=="S"))
+S_length
+
+Early_S_length<-nrow(filter(working_df_wo_outliers_5,Cell_cycle=="Early S"))
+Early_S_length
+
+Late_S_length<-nrow(filter(working_df_wo_outliers_5,Cell_cycle=="Late S"))
+Late_S_length
+```
+
+#Transfer pictures
+```{r}
+
+#Original folder with pipctures to sort
+dir="/Users/nicolas/OneDrive - Université de Rennes 1/Projet_Interface_Biologie/Results/Hoechst/"
+setwd(dir)
+
+#Destination folders with sorted pictures
+
+G1_folder="/Users/nicolas/OneDrive - Université de Rennes 1/Projet_Interface_Biologie/Results/Dataset/Train/G1/"
+G2_folder="/Users/nicolas/OneDrive - Université de Rennes 1/Projet_Interface_Biologie/Results/Dataset/Train/G2/"
+S_folder="/Users/nicolas/OneDrive - Université de Rennes 1/Projet_Interface_Biologie/Results/Dataset/Train/S/"
+Early_S_folder="/Users/nicolas/OneDrive - Université de Rennes 1/Projet_Interface_Biologie/Results/Dataset/Train/Early_S/"
+Late_S_folder="/Users/nicolas/OneDrive - Université de Rennes 1/Projet_Interface_Biologie/Results/Dataset/Train/Late_S/"
+
+count_G1=0
+count_G2=0
+count_S=0
+count_Early_S=0
+count_Late_S=0
+for (i in 1:length(working_df_wo_outliers_5$Cell_cycle)) {
+  if (working_df_wo_outliers_5$Cell_cycle[i] == "G1") {
+      count_G1=1+count_G1
+      file.copy(print(paste0(working_df_wo_outliers_5$Label_Hoechst[i],".png")),G1_folder)
+    } else {
+      print("No")
+    }
+    print(paste0("G1: ",count_G1))
+    if (working_df_wo_outliers_5$Cell_cycle[i] == "G2") {
+      count_G2=1+count_G2
+      file.copy(print(paste0(working_df_wo_outliers_5$Label_Hoechst[i],".png")),G2_folder)
+    } else {
+      print("No")
+    }
+    print(paste0("G2: ",count_G2))
+    if (working_df_wo_outliers_5$Cell_cycle[i] == "S") {
+      count_S=1+count_S
+      file.copy(print(paste0(working_df_wo_outliers_5$Label_Hoechst[i],".png")),S_folder)
+    } else {
+      print("No")
+    }
+    print(paste0("S: ",count_S))
+    if (working_df_wo_outliers_5$Cell_cycle[i] == "Early S") {
+      count_Early_S=1+count_Early_S
+      file.copy(print(paste0(working_df_wo_outliers_5$Label_Hoechst[i],".png")),Early_S_folder)
+    } else {
+      print("No")
+    }
+    print(paste0("Early S: ",count_Early_S))
+      if (working_df_wo_outliers_5$Cell_cycle[i] == "Late S") {
+      count_Late_S=1+count_Late_S
+      file.copy(print(paste0(working_df_wo_outliers_5$Label_Hoechst[i],".png")),Late_S_folder)
+    } else {
+      print("No")
+    }
+    print(paste0("Late S: ",count_Late_S))
+}
+
+```
+
